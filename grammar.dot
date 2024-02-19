@@ -1,0 +1,35 @@
+# <cols> a list of columns
+# <source> a table or subquery
+
+digraph my_graph {
+    START SELECT SELECTED FROM FROMED WHERE WHEREED GROUPBY GROUPBYED HAVING HAVEINGED END;
+
+    # SELECT
+    START -> SELECT [label="SELECT"];
+        SELECT -> DISTINCT [label="DISTINCT"];
+            DISTINCT -> SELECTED [label="<cols>"]
+        SELECT -> ALL [label="ALL"];
+            ALL -> SELECTED [label="<cols>"]
+        SELECT -> SELECTED [label="<cols>"]
+
+    SELECTED -> END [label=""]
+
+    # FROM
+    SELECTED -> FROM [label="FROM"]
+        FROM -> FROMED [label="<source>"]
+            FROMED -> WHERE [label="WHERE"]
+            FROMED -> GROUPBY [label="GROUP BY"]
+            FROMED -> END [label=""]
+
+    # WHERE
+    WHERE -> WHEREED [label="<expr>"]
+        WAHEREED -> GROUPBY [label="GROUP BY"]
+        WAHEREED -> END [label=""]
+
+    # GROUP BY
+    GROUPBY -> GROUPBYED [label="<ordering-term>"]
+        GROUPBYED -> HAVING [label="HAVING"]
+            HAVEING -> HAVEINGED [label="<expr>"]
+                HAVEINGED -> END [label=""]
+        GROUPBYED -> END [label=""]
+}
