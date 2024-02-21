@@ -2,8 +2,8 @@ digraph my_graph {
     START;
     SELECT [label=SELECT];
     SELECT_TARGET [label=cols];
-    DISTINCT_KEYWORD [label=DISTINCT];
-    ALL_KEYWORD [label=ALL];
+    DISTINCT_SPECIFIER [label=DISTINCT];
+    ALL_SPECIFIER [label=ALL];
     FROM [label=FROM];
     FROM_TARGET [label=source];
     WHERE [label=WHERE];
@@ -16,8 +16,8 @@ digraph my_graph {
 
     START -> SELECT
     SELECT -> SELECT_TARGET
-    SELECT -> DISTINCT_KEYWORD -> SELECT_TARGET
-    SELECT -> ALL_KEYWORD -> SELECT_TARGET
+    SELECT -> DISTINCT_SPECIFIER -> SELECT_TARGET
+    SELECT -> ALL_SPECIFIER -> SELECT_TARGET
         SELECT_TARGET -> FROM
         SELECT_TARGET -> WHERE
         SELECT_TARGET -> GROUPBY

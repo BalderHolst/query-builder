@@ -3,7 +3,6 @@
 import pydot
 from pydot import Graph, Node, Edge
 
-
 class ForwardMap():
     def __init__(self, graph: Graph):
         self.graph = graph
@@ -66,6 +65,11 @@ def node_is_target(node: Node):
     parts = node.get_name().split("_")
     return len(parts) > 1 and parts[1] == "TARGET"
 
+def node_is_specifier(node: Node):
+    parts = node.get_name().split("_")
+    return len(parts) > 1 and parts[1] == "SPECIFIER"
+
+
 class PythonMethod:
     def __init__(self, name: str):
         self.name = name
@@ -84,12 +88,19 @@ class PythonMethod:
             c.line(f"def {self.name}(self): {body}")
         return c
 
+    def __repr__(self) -> str:
+        return f"{self.name}{tuple(self.args)}"
+
 class PythonClass:
     def __init__(self, name: str):
         self.name = name
         self.args = []
-        self.methods = []
+        self.methods: list[PythonMethod] = []
         self.flags = []
+
+    def constructor(self):
+        args = ", ".join(self.args)
+        return f"{self.name}({args})"
 
     def code(self) -> str:
         c = Code()
@@ -155,7 +166,7 @@ def create_class(node, node_map: ForwardMap):
             new_class = create_class(next_node, node_map)
             python_class.methods = new_class.methods
             continue
-
+        
         method_name = next_node.get_label()
         if not method_name: method_name = next_node.get_name()
         python_class.methods.append(PythonMethod(method_name))
@@ -173,6 +184,9 @@ def create_classes():
     for this_node in graph.get_nodes():
         if node_is_target(this_node): continue
         python_class = create_class(this_node, node_map)
+
+        if node_is_specifier(this_node): python_class.args = []
+
         print(python_class.name, python_class.methods)
         classes.append(python_class)
 
@@ -181,10 +195,10 @@ def create_classes():
 def populate_methods(module: PythonModule):
 
     for python_class in module.classes:
-
         for method in python_class.methods:
             method_class = module.find_class(method.name)
             method.args.extend(method_class.args)
+            method.returns = method_class.constructor()
 
 pass
 def main():
