@@ -1,32 +1,48 @@
+#!/usr/bin/env python3
+
 import pydot
 from pydot import Graph, Node, Edge
 
-def generate_name_to_node_map(graph: Graph):
-    nodes: list[Node] = graph.get_nodes()
-    name_to_node = {}
-    for n in nodes:
-        name = n.get_name()
-        name_to_node[name] = n
-    return name_to_node
 
-def generate_forward_map(graph: Graph):
-    edges: list[Edge] = graph.get_edges()
-    name_to_node = generate_name_to_node_map(graph)
-    forward_map = {}
-    for e in edges:
-        from_node = name_to_node[e.get_source()]
-        to_node = name_to_node[e.get_destination()]
+class ForwardMap():
+    def __init__(self, graph: Graph):
+        self.graph = graph
+        self.map = self.generate_forward_map()
+        print(self.map)
 
-        if not from_node in forward_map:
-            forward_map[from_node] = [to_node]
+    def generate_forward_map(self):
+        edges: list[Edge] = self.graph.get_edges()
+        name_to_node = self.generate_name_to_node_map()
+        forward_map = {}
+        for e in edges:
+            from_node_name = e.get_source()
+            to_node = name_to_node[e.get_destination()]
+
+            if not from_node_name in forward_map:
+                forward_map[from_node_name] = [to_node]
+            else:
+                forward_map[from_node_name].append(to_node)
+        return forward_map
+
+    def generate_name_to_node_map(self):
+        nodes: list[Node] = self.graph.get_nodes()
+        name_to_node = {}
+        for n in nodes:
+            name = n.get_name()
+            name_to_node[name] = n
+        return name_to_node
+
+    def get(self, node: str):
+        if node in self.map:
+            return self.map[node]
         else:
-            forward_map[from_node].append(to_node)
-    return forward_map
+            return []
+
 
 class Code:
-    def __init__(self):
+    def __init__(self, indent = 0):
         self.lines = []
-        self.current_indent = 0
+        self.current_indent = indent
 
     def text(self) -> str:
         return "\n".join(self.lines)
@@ -50,94 +66,134 @@ def node_is_target(node: Node):
     parts = node.get_name().split("_")
     return len(parts) > 1 and parts[1] == "TARGET"
 
-def main():
-    graph: Graph = pydot.graph_from_dot_file("./grammar.dot")[0]
+class PythonMethod:
+    def __init__(self, name: str):
+        self.name = name
+        self.args = []
+        self.returns = None
 
-    node_map = generate_forward_map(graph)
+    def code(self, indent = 0) -> str:
+        c = Code(indent=indent)
 
-    classes = []
+        body = "pass"
+        if self.returns: body = f"return {self.returns}"
 
-    for (k, v) in node_map.items():
+        if len(self.args) > 0:
+            c.line(f"def {self.name}(self, {', '.join(self.args)}): {body}")
+        else:
+            c.line(f"def {self.name}(self): {body}")
+        return c
 
-        if node_is_target(k): continue
+class PythonClass:
+    def __init__(self, name: str):
+        self.name = name
+        self.args = []
+        self.methods = []
+        self.flags = []
 
-        class_name = k.get_label()
-        if not class_name: class_name = k.get_name()
-
-        class_args = []
-        class_methods = []
-
-        for after in v:
-
-            if node_is_target(after):
-                class_args.append(after.get_label())
-                for n in node_map[after]:
-                    if not n.get_label(): class_methods.append(n.get_name())
-                    else: class_methods.append(n.get_label())
-
-            else:
-                after_method = after.get_label()
-                if not after_method: after_method = after.get_name()
-                class_methods.append(after_method)
-
-
-        classes.append({
-            "name": class_name,
-            "args": class_args,
-            "methods": class_methods
-        })
-
-    module = Code()
-
-    for class_ in classes:
-
+    def code(self) -> str:
         c = Code()
-        c.line(f"class {class_['name']}:")
+        c.line(f"class {self.name}:")
         c.indent()
 
-        if len(class_['args']) > 0:
-            c.line(f"def __init__(self, history, {', '.join(class_['args'])}):")
-            c.indent()
-            c.line("self.history = history")
-            c.line(f"self.history.append('{class_['name']}')")
-            for arg in class_['args']:
-                c.line(f"self.history.append({arg})")
-            c.unindent()
-        else:
-            c.line("def __init__(self, history):")
-            c.indent()
-            c.line("self.history = history")
-            c.line(f"self.history.append('{class_['name']}')")
-            c.unindent()
-        c.line("")
+        args = ["self"] + self.args + list(map(lambda x: f"{x}=false", self.flags))
 
-        for method in class_['methods']:
+        c.line(f"def __init__({', '.join(args)}):")
+        if len(args) <= 1:
+            c.indent(); c.line("pass"); c.unindent()
 
-            extra_args = []
-            for cl in classes:
-                if method == cl['name']:
-                    extra_args = cl['args']
-                    break
+        c.indent()
+        for arg in self.args:
+            c.line(f"self.{arg} = {arg}")
+        c.unindent()
 
-            method_code = ""
-            if len(extra_args) > 0:
-                method_code += f"def {method}(self, {', '.join(extra_args)}): "
-            else:
-                method_code += f"def {method}(self): "
-            method_code += f"return {method}(self.history, {', '.join(extra_args)})"
+        for method in self.methods:
+            c.extend(method.code(indent=c.current_indent))
 
-            c.line(method_code)
-
-        # Add repr
-        c.line("def __repr__(self): return ' '.join(self.history)")
+        c.unindent()
 
         c.line("")
 
-        module.extend(c)
+        return c
+    
+    def __repr__(self) -> str:
+        return f"Class {self.name}"
 
-    text = module.text()
+class PythonModule:
+    def __init__(self, classes: list[PythonClass]):
+        self.classes = classes
+
+    def find_class(self, name: str):
+        for python_class in self.classes:
+            if python_class.name == name:
+                return python_class
+        print(f"ERROR: DID NOT FIND '{name}'")
+        exit(1)
+
+    def code(self) -> str:
+        c = Code()
+        for python_class in self.classes:
+            c.line("")
+            c.extend(python_class.code())
+        return c
+
+def create_class(node, node_map: ForwardMap):
+
+    class_name = node.get_label()
+    if not class_name: class_name = node.get_name()
+
+    python_class = PythonClass(class_name)
+
+    next_nodes = node_map.get(node.get_name())
+    for next_node in next_nodes:
+        print("\t", next_node.get_name())
+
+        # Is it an argument?
+        if node_is_target(next_node):
+            arg = next_node.get_label()
+            python_class.args.append(arg)
+            new_class = create_class(next_node, node_map)
+            python_class.methods = new_class.methods
+            continue
+
+        method_name = next_node.get_label()
+        if not method_name: method_name = next_node.get_name()
+        python_class.methods.append(PythonMethod(method_name))
+
+    return python_class
+
+
+
+def create_classes():
+    graph: Graph = pydot.graph_from_dot_file("./grammar.dot")[0]
+    node_map = ForwardMap(graph)
+
+    classes: list[PythonClass] = []
+
+    for this_node in graph.get_nodes():
+        if node_is_target(this_node): continue
+        python_class = create_class(this_node, node_map)
+        print(python_class.name, python_class.methods)
+        classes.append(python_class)
+
+    return classes
+
+def populate_methods(module: PythonModule):
+
+    for python_class in module.classes:
+
+        for method in python_class.methods:
+            method_class = module.find_class(method.name)
+            method.args.extend(method_class.args)
+
+pass
+def main():
+    classes = create_classes()
+    module = PythonModule(classes)
+    populate_methods(module)
+
     with open("out.py", "w") as f:
-        f.write(text)
+        f.write(str(module.code()))
 
 
 if __name__ == "__main__":

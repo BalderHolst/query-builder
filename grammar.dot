@@ -1,13 +1,10 @@
-# <cols> a list of columns
-# <source> a table or subquery
-
 digraph my_graph {
     START;
     SELECT [label=SELECT];
     SELECT_TARGET [label=cols];
+    DISTINCT_KEYWORD [label=DISTINCT];
+    ALL_KEYWORD [label=ALL];
     FROM [label=FROM];
-    DISTINCT [label=DISTINCT];
-    ALL [label=ALL];
     FROM_TARGET [label=source];
     WHERE [label=WHERE];
     WHERE_TARGET [label=expr];
@@ -17,23 +14,23 @@ digraph my_graph {
     HAVING_TARGET [label=expr];
     END;
 
-    START -> SELECT;
-    SELECT -> SELECT_TARGET;
-    SELECT -> DISTINCT -> SELECT_TARGET;
-    SELECT -> ALL -> SELECT_TARGET;
+    START -> SELECT
+    SELECT -> SELECT_TARGET
+    SELECT -> DISTINCT_KEYWORD -> SELECT_TARGET
+    SELECT -> ALL_KEYWORD -> SELECT_TARGET
         SELECT_TARGET -> FROM
-        SELECT_TARGET -> WHERE;
-        SELECT_TARGET -> GROUPBY;
+        SELECT_TARGET -> WHERE
+        SELECT_TARGET -> GROUPBY
 
-    FROM -> FROM_TARGET;
-        FROM_TARGET -> END;
-        FROM_TARGET -> GROUPBY;
-        FROM_TARGET -> WHERE;
+    FROM -> FROM_TARGET
+        FROM_TARGET -> END
+        FROM_TARGET -> GROUPBY
+        FROM_TARGET -> WHERE
 
-    WHERE -> WHERE_TARGET;
-        WHERE_TARGET -> GROUPBY;
-        WHERE_TARGET -> END;
+    WHERE -> WHERE_TARGET
+        WHERE_TARGET -> GROUPBY
+        WHERE_TARGET -> END
 
-    GROUPBY -> GROUPBY_TARGET;
-        GROUPBY_TARGET -> HAVING -> HAVING_TARGET -> END;
+    GROUPBY -> GROUPBY_TARGET
+        GROUPBY_TARGET -> HAVING -> HAVING_TARGET -> END
 }
