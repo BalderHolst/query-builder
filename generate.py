@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from enum import Enum
 import pydot
 from pydot import Graph, Node, Edge
 
@@ -75,12 +76,15 @@ class PythonMethod:
         self.name = name
         self.args = []
         self.returns = None
+        self.property = False
 
     def code(self, indent = 0) -> str:
         c = Code(indent=indent)
 
         body = "pass"
         if self.returns: body = f"return {self.returns}"
+
+        if self.property: c.line("@property")
 
         if len(self.args) > 0:
             c.line(f"def {self.name}(self, {', '.join(self.args)}): {body}")
@@ -91,12 +95,17 @@ class PythonMethod:
     def __repr__(self) -> str:
         return f"{self.name}{tuple(self.args)}"
 
+class PythonClassType(Enum):
+    DIRECTIVE = 0,
+    SPECIFIER = 1,
+
 class PythonClass:
     def __init__(self, name: str):
         self.name = name
         self.args = []
         self.methods: list[PythonMethod] = []
         self.flags = []
+        self.type = PythonClassType.DIRECTIVE
 
     def constructor(self):
         args = ", ".join(self.args)
@@ -185,7 +194,9 @@ def create_classes():
         if node_is_target(this_node): continue
         python_class = create_class(this_node, node_map)
 
-        if node_is_specifier(this_node): python_class.args = []
+        if node_is_specifier(this_node):
+            python_class.args = []
+            python_class.type = PythonClassType.SPECIFIER
 
         print(python_class.name, python_class.methods)
         classes.append(python_class)
@@ -199,6 +210,8 @@ def populate_methods(module: PythonModule):
             method_class = module.find_class(method.name)
             method.args.extend(method_class.args)
             method.returns = method_class.constructor()
+            if method_class.type == PythonClassType.SPECIFIER:
+                method.property = True
 
 pass
 def main():

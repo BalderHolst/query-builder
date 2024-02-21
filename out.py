@@ -11,7 +11,9 @@ class SELECT:
     def FROM(self, source): return FROM(source)
     def WHERE(self, expr): return WHERE(expr)
     def GROUP_BY(self, cols): return GROUP_BY(cols)
+    @property
     def DISTINCT(self): return DISTINCT()
+    @property
     def ALL(self): return ALL()
 
 
@@ -62,4 +64,4 @@ class END:
     def __init__(self):
         pass
 
-SELECT("test").ALL().FROM("table").END
+SELECT().ALL

@@ -1,3 +1,5 @@
+# https://www.sqlite.org/syntaxdiagrams.html
+
 digraph my_graph {
     START;
     SELECT [label=SELECT];
