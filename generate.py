@@ -4,6 +4,8 @@ from enum import Enum
 import pydot
 from pydot import Graph, Node, Edge
 
+HISTORY_VAR = "history"
+
 class ForwardMap():
     def __init__(self, graph: Graph):
         self.graph = graph
@@ -83,13 +85,9 @@ class PythonMethod:
 
         body = "pass"
         if self.returns: body = f"return {self.returns}"
-
         if self.property: c.line("@property")
-
-        if len(self.args) > 0:
-            c.line(f"def {self.name}(self, {', '.join(self.args)}): {body}")
-        else:
-            c.line(f"def {self.name}(self): {body}")
+        args = ["self"] + self.args
+        c.line(f"def {self.name}({', '.join(args)}): {body}")
         return c
 
     def __repr__(self) -> str:
@@ -98,37 +96,40 @@ class PythonMethod:
 class PythonClassType(Enum):
     DIRECTIVE = 0,
     SPECIFIER = 1,
+    START = 2,
+    END = 3,
 
 class PythonClass:
-    def __init__(self, name: str):
+    def __init__(self, name: str, type: PythonClassType = PythonClassType.DIRECTIVE):
         self.name = name
-        self.args = []
+        self.extra_args = []
         self.methods: list[PythonMethod] = []
         self.flags = []
-        self.type = PythonClassType.DIRECTIVE
+        self.type = type
 
-    def constructor(self):
-        args = ", ".join(self.args)
-        return f"{self.name}({args})"
+    def args(self):
+        return self.extra_args + [f"{HISTORY_VAR}=[]"]
 
     def code(self) -> str:
         c = Code()
         c.line(f"class {self.name}:")
         c.indent()
 
-        args = ["self"] + self.args + list(map(lambda x: f"{x}=false", self.flags))
+        args = ["self"] + self.args() + list(map(lambda x: f"{x}=false", self.flags))
 
         c.line(f"def __init__({', '.join(args)}):")
         if len(args) <= 1:
             c.indent(); c.line("pass"); c.unindent()
 
         c.indent()
-        for arg in self.args:
+        c.line(f"self.history = history + ['{self.name.replace('_', ' ')}']")
+        for arg in self.extra_args:
             c.line(f"self.{arg} = {arg}")
         c.unindent()
 
         for method in self.methods:
             c.extend(method.code(indent=c.current_indent))
+        c.line(f"def __repr__(self): return ' '.join(self.history)")
 
         c.unindent()
 
@@ -160,9 +161,13 @@ class PythonModule:
 def create_class(node, node_map: ForwardMap):
 
     class_name = node.get_label()
-    if not class_name: class_name = node.get_name()
+    t = PythonClassType.DIRECTIVE
+    if not class_name:
+        class_name = node.get_name()
+        if class_name == "START": t = PythonClassType.START
+        elif class_name == "END": t = PythonClassType.END
 
-    python_class = PythonClass(class_name)
+    python_class = PythonClass(class_name, type=t)
 
     next_nodes = node_map.get(node.get_name())
     for next_node in next_nodes:
@@ -171,7 +176,7 @@ def create_class(node, node_map: ForwardMap):
         # Is it an argument?
         if node_is_target(next_node):
             arg = next_node.get_label()
-            python_class.args.append(arg)
+            python_class.extra_args.append(arg)
             new_class = create_class(next_node, node_map)
             python_class.methods = new_class.methods
             continue
@@ -195,7 +200,7 @@ def create_classes():
         python_class = create_class(this_node, node_map)
 
         if node_is_specifier(this_node):
-            python_class.args = []
+            python_class.extra_args = []
             python_class.type = PythonClassType.SPECIFIER
 
         print(python_class.name, python_class.methods)
@@ -208,8 +213,8 @@ def populate_methods(module: PythonModule):
     for python_class in module.classes:
         for method in python_class.methods:
             method_class = module.find_class(method.name)
-            method.args.extend(method_class.args)
-            method.returns = method_class.constructor()
+            method.args.extend(method_class.extra_args)
+            method.returns = f"{method_class.name}({', '.join(method_class.extra_args + ['history=self.history'])})"
             if method_class.type == PythonClassType.SPECIFIER:
                 method.property = True
 

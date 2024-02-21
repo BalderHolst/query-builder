@@ -1,67 +1,81 @@
 
 class START:
-    def __init__(self):
-        pass
-    def SELECT(self, cols): return SELECT(cols)
+    def __init__(self, history=[]):
+        self.history = history + ['START']
+    def SELECT(self, cols): return SELECT(cols, history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class SELECT:
-    def __init__(self, cols):
+    def __init__(self, cols, history=[]):
+        self.history = history + ['SELECT']
         self.cols = cols
-    def FROM(self, source): return FROM(source)
-    def WHERE(self, expr): return WHERE(expr)
-    def GROUP_BY(self, cols): return GROUP_BY(cols)
+    def FROM(self, source): return FROM(source, history=self.history)
+    def WHERE(self, expr): return WHERE(expr, history=self.history)
+    def GROUP_BY(self, cols): return GROUP_BY(cols, history=self.history)
     @property
-    def DISTINCT(self): return DISTINCT()
+    def DISTINCT(self): return DISTINCT(history=self.history)
     @property
-    def ALL(self): return ALL()
+    def ALL(self): return ALL(history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class DISTINCT:
-    def __init__(self):
-        pass
-    def FROM(self, source): return FROM(source)
-    def WHERE(self, expr): return WHERE(expr)
-    def GROUP_BY(self, cols): return GROUP_BY(cols)
+    def __init__(self, history=[]):
+        self.history = history + ['DISTINCT']
+    def FROM(self, source): return FROM(source, history=self.history)
+    def WHERE(self, expr): return WHERE(expr, history=self.history)
+    def GROUP_BY(self, cols): return GROUP_BY(cols, history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class ALL:
-    def __init__(self):
-        pass
-    def FROM(self, source): return FROM(source)
-    def WHERE(self, expr): return WHERE(expr)
-    def GROUP_BY(self, cols): return GROUP_BY(cols)
+    def __init__(self, history=[]):
+        self.history = history + ['ALL']
+    def FROM(self, source): return FROM(source, history=self.history)
+    def WHERE(self, expr): return WHERE(expr, history=self.history)
+    def GROUP_BY(self, cols): return GROUP_BY(cols, history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class FROM:
-    def __init__(self, source):
+    def __init__(self, source, history=[]):
+        self.history = history + ['FROM']
         self.source = source
-    def END(self): return END()
-    def GROUP_BY(self, cols): return GROUP_BY(cols)
-    def WHERE(self, expr): return WHERE(expr)
+    def END(self): return END(history=self.history)
+    def GROUP_BY(self, cols): return GROUP_BY(cols, history=self.history)
+    def WHERE(self, expr): return WHERE(expr, history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class WHERE:
-    def __init__(self, expr):
+    def __init__(self, expr, history=[]):
+        self.history = history + ['WHERE']
         self.expr = expr
-    def GROUP_BY(self, cols): return GROUP_BY(cols)
-    def END(self): return END()
+    def GROUP_BY(self, cols): return GROUP_BY(cols, history=self.history)
+    def END(self): return END(history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class GROUP_BY:
-    def __init__(self, cols):
+    def __init__(self, cols, history=[]):
+        self.history = history + ['GROUP BY']
         self.cols = cols
-    def HAVING(self, expr): return HAVING(expr)
+    def HAVING(self, expr): return HAVING(expr, history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class HAVING:
-    def __init__(self, expr):
+    def __init__(self, expr, history=[]):
+        self.history = history + ['HAVING']
         self.expr = expr
-    def END(self): return END()
+    def END(self): return END(history=self.history)
+    def __repr__(self): return ' '.join(self.history)
 
 
 class END:
-    def __init__(self):
-        pass
+    def __init__(self, history=[]):
+        self.history = history + ['END']
+    def __repr__(self): return ' '.join(self.history)
 
-SELECT().ALL
+q = SELECT("*").DISTINCT.FROM("TaBLe").WHERE("a = 4")
