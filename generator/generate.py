@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 from enum import Enum
 import pydot
 from pydot import Graph, Node, Edge
@@ -189,8 +190,8 @@ def create_class(node, node_map: ForwardMap):
 
 
 
-def create_classes():
-    graph: Graph = pydot.graph_from_dot_file("./grammar.dot")[0]
+def create_classes(grammar_path: str):
+    graph: Graph = pydot.graph_from_dot_file(grammar_path)[0]
     node_map = ForwardMap(graph)
 
     classes: list[PythonClass] = []
@@ -218,15 +219,22 @@ def populate_methods(module: PythonModule):
             if method_class.type == PythonClassType.SPECIFIER:
                 method.property = True
 
-pass
-def main():
-    classes = create_classes()
+def usage():
+    print(f"{sys.argv[0]} <grammar> <output-path>")
+
+if __name__ == "__main__":
+    
+    if len(sys.argv) != 3:
+        print("Error incorrect number of arguments.")
+        usage()
+        exit(1)
+
+    grammar_path = sys.argv[1]
+    output_path = sys.argv[2]
+
+    classes = create_classes(grammar_path)
     module = PythonModule(classes)
     populate_methods(module)
 
-    with open("out.py", "w") as f:
+    with open(output_path, "w") as f:
         f.write(str(module.code()))
-
-
-if __name__ == "__main__":
-    main()

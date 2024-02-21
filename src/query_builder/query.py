@@ -77,5 +77,3 @@ class END:
     def __init__(self, history=[]):
         self.history = history + ['END']
     def __repr__(self): return ' '.join(self.history)
-
-q = SELECT("*").DISTINCT.FROM("TaBLe").WHERE("a = 4")
