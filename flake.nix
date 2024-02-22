@@ -22,7 +22,8 @@
             pkgs.python3Packages.pydot
         ] ++ devDependencies;
         shellHook = ''
-        PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+        make dev
+        PYTHONPATH="$(pwd)/build:$PYTHONPATH"
         '';
     };
   };

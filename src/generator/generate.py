@@ -4,14 +4,18 @@ import sys
 from enum import Enum
 import pydot
 from pydot import Graph, Node, Edge
+import inspect
 
-HISTORY_VAR = "history"
+HISTORY = "_history"
+END_METHOD = "sql"
+
+START_NODE = "START"
+END_NODE = "END"
 
 class ForwardMap():
     def __init__(self, graph: Graph):
         self.graph = graph
         self.map = self.generate_forward_map()
-        print(self.map)
 
     def generate_forward_map(self):
         edges: list[Edge] = self.graph.get_edges()
@@ -73,7 +77,6 @@ def node_is_specifier(node: Node):
     parts = node.get_name().split("_")
     return len(parts) > 1 and parts[1] == "SPECIFIER"
 
-
 class PythonMethod:
     def __init__(self, name: str):
         self.name = name
@@ -109,7 +112,7 @@ class PythonClass:
         self.type = type
 
     def args(self):
-        return self.extra_args + [f"{HISTORY_VAR}=[]"]
+        return self.extra_args + [f"{HISTORY}=[]"]
 
     def code(self) -> str:
         c = Code()
@@ -118,19 +121,20 @@ class PythonClass:
 
         args = ["self"] + self.args() + list(map(lambda x: f"{x}=false", self.flags))
 
-        c.line(f"def __init__({', '.join(args)}):")
-        if len(args) <= 1:
-            c.indent(); c.line("pass"); c.unindent()
+        if self.type == PythonClassType.START:
+            c.line(f"def __init__(self): self.{HISTORY} = []")
+        else:
+            c.line(f"def __init__({', '.join(args)}):")
+            c.indent()
+            c.line(f"self.{HISTORY} = {HISTORY} + ['{self.name.replace('_', ' ')}']")
 
-        c.indent()
-        c.line(f"self.history = history + ['{self.name.replace('_', ' ')}']")
-        for arg in self.extra_args:
-            c.line(f"self.{arg} = {arg}")
-        c.unindent()
+            for arg in self.extra_args:
+                c.line(f"self.{arg} = {arg}")
+            c.unindent()
 
         for method in self.methods:
             c.extend(method.code(indent=c.current_indent))
-        c.line(f"def __repr__(self): return ' '.join(self.history)")
+        c.line(f"def __repr__(self): return ' '.join(self.{HISTORY})")
 
         c.unindent()
 
@@ -142,8 +146,9 @@ class PythonClass:
         return f"Class {self.name}"
 
 class PythonModule:
-    def __init__(self, classes: list[PythonClass]):
+    def __init__(self, classes: list[PythonClass], imports = []):
         self.classes = classes
+        self.imports = imports
 
     def find_class(self, name: str):
         for python_class in self.classes:
@@ -154,6 +159,10 @@ class PythonModule:
 
     def code(self) -> str:
         c = Code()
+
+        for imp in self.imports:
+            c.line(imp)
+
         for python_class in self.classes:
             c.line("")
             c.extend(python_class.code())
@@ -165,14 +174,16 @@ def create_class(node, node_map: ForwardMap):
     t = PythonClassType.DIRECTIVE
     if not class_name:
         class_name = node.get_name()
-        if class_name == "START": t = PythonClassType.START
-        elif class_name == "END": t = PythonClassType.END
+        if class_name == "START":
+            t = PythonClassType.START
+            class_name = "Query"
+        elif class_name == END_NODE:
+            t = PythonClassType.END
 
     python_class = PythonClass(class_name, type=t)
 
     next_nodes = node_map.get(node.get_name())
     for next_node in next_nodes:
-        print("\t", next_node.get_name())
 
         # Is it an argument?
         if node_is_target(next_node):
@@ -199,12 +210,16 @@ def create_classes(grammar_path: str):
     for this_node in graph.get_nodes():
         if node_is_target(this_node): continue
         python_class = create_class(this_node, node_map)
+        
+        if python_class.type == PythonClassType.END:
+            # We do not need a class for the ending method.
+            # It should return a string instead.
+            continue
 
         if node_is_specifier(this_node):
             python_class.extra_args = []
             python_class.type = PythonClassType.SPECIFIER
 
-        print(python_class.name, python_class.methods)
         classes.append(python_class)
 
     return classes
@@ -213,9 +228,13 @@ def populate_methods(module: PythonModule):
 
     for python_class in module.classes:
         for method in python_class.methods:
+            if method.name == END_NODE:
+                method.name = END_METHOD
+                method.returns = f"make_sql(self.{HISTORY})"
+                continue
             method_class = module.find_class(method.name)
             method.args.extend(method_class.extra_args)
-            method.returns = f"{method_class.name}({', '.join(method_class.extra_args + ['history=self.history'])})"
+            method.returns = f"{method_class.name}({', '.join(method_class.extra_args + [f'{HISTORY}=self.{HISTORY}'])})"
             if method_class.type == PythonClassType.SPECIFIER:
                 method.property = True
 
@@ -233,7 +252,8 @@ if __name__ == "__main__":
     output_path = sys.argv[2]
 
     classes = create_classes(grammar_path)
-    module = PythonModule(classes)
+    module = PythonModule(classes, [f"from query_builder.query_to_sql import make_sql"])
+    module.imports
     populate_methods(module)
 
     with open(output_path, "w") as f:
