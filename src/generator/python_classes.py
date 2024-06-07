@@ -73,11 +73,12 @@ class PythonClass:
         return f"Class {self.name}"
 
 class PythonMethod:
-    def __init__(self, name: str, args=[], returns=None, property=False):
+    def __init__(self, name: str, args=[], returns=None, property=False, docstring=""):
         self.name = name
         self.args = args
         self.returns = returns
         self.property = property
+        self.docstring = docstring
 
     def code(self, indent = 0) -> str:
         c = Code(indent=indent)
@@ -86,7 +87,11 @@ class PythonMethod:
         if self.returns: body = f"return {self.returns}"
         if self.property: c.line("@property")
         args = ["self"] + self.args
-        c.line(f"def {self.name}({', '.join(args)}): {body}")
+        c.line(f"def {self.name}({', '.join(args)}):")
+        c.indent()
+        if len(self.docstring) > 0:
+            c.line("\"\"\"" + self.docstring + "\"\"\"")
+        c.line(body)
         return c
 
     def __repr__(self) -> str:

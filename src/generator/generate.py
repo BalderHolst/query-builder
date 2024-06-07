@@ -94,7 +94,7 @@ def create_classes(grammar_path: str):
     for this_node in graph.get_nodes():
         if node_is_target(this_node): continue
         python_class = create_class(this_node, node_map)
-        
+
         if python_class.type == PythonClassType.END:
             # We do not need a class for the ending method.
             # It should return a string instead.
@@ -114,10 +114,12 @@ def populate_methods(module: PythonModule):
         for method in python_class.methods:
             if method.name == END_NODE:
                 method.name = END_METHOD
+                method.docstring = "Convert query to SQL string."
                 method.returns = f"make_sql(self.{HISTORY})"
                 continue
             method_class = module.find_class(method.name)
             method.args = method_class.extra_args
+            method.docstring = f"Add `{method.name}` keyword to query."
             method.returns = f"{method_class.name}({', '.join(method_class.extra_args + [f'{HISTORY}=self.{HISTORY}'])})"
             if method_class.type == PythonClassType.SPECIFIER:
                 method.property = True
