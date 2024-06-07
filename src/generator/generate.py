@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
-from enum import Enum
 import pydot
 from pydot import Graph, Node, Edge
-import inspect
 
-HISTORY = "_history"
+from python_classes import PythonModule, PythonClass, PythonClassType, PythonMethod, HISTORY
+
 END_METHOD = "sql"
-
 START_NODE = "START"
 END_NODE = "END"
 
@@ -45,30 +43,6 @@ class ForwardMap():
         else:
             return []
 
-
-class Code:
-    def __init__(self, indent = 0):
-        self.lines = []
-        self.current_indent = indent
-
-    def text(self) -> str:
-        return "\n".join(self.lines)
-
-    def line(self, s: str):
-        self.lines.append("    " * self.current_indent + s)
-
-    def indent(self):
-        self.current_indent += 1
-
-    def unindent(self):
-        self.current_indent -= 1
-
-    def extend(self, other):
-        self.lines.extend(other.lines)
-
-    def __repr__(self):
-        return self.text()
-
 def node_is_target(node: Node):
     parts = node.get_name().split("_")
     return len(parts) > 1 and parts[1] == "TARGET"
@@ -77,96 +51,6 @@ def node_is_specifier(node: Node):
     parts = node.get_name().split("_")
     return len(parts) > 1 and parts[1] == "SPECIFIER"
 
-class PythonMethod:
-    def __init__(self, name: str):
-        self.name = name
-        self.args = []
-        self.returns = None
-        self.property = False
-
-    def code(self, indent = 0) -> str:
-        c = Code(indent=indent)
-
-        body = "pass"
-        if self.returns: body = f"return {self.returns}"
-        if self.property: c.line("@property")
-        args = ["self"] + self.args
-        c.line(f"def {self.name}({', '.join(args)}): {body}")
-        return c
-
-    def __repr__(self) -> str:
-        return f"{self.name}{tuple(self.args)}"
-
-class PythonClassType(Enum):
-    DIRECTIVE = 0,
-    SPECIFIER = 1,
-    START = 2,
-    END = 3,
-
-class PythonClass:
-    def __init__(self, name: str, type: PythonClassType = PythonClassType.DIRECTIVE):
-        self.name = name
-        self.extra_args = []
-        self.methods: list[PythonMethod] = []
-        self.flags = []
-        self.type = type
-
-    def args(self):
-        return self.extra_args + [f"{HISTORY}=[]"]
-
-    def code(self) -> str:
-        c = Code()
-        c.line(f"class {self.name}:")
-        c.indent()
-
-        args = ["self"] + self.args() + list(map(lambda x: f"{x}=false", self.flags))
-
-        if self.type == PythonClassType.START:
-            c.line(f"def __init__(self): self.{HISTORY} = []")
-        else:
-            c.line(f"def __init__({', '.join(args)}):")
-            c.indent()
-            c.line(f"self.{HISTORY} = {HISTORY} + ['{self.name.replace('_', ' ')}']")
-
-            for arg in self.extra_args:
-                c.line(f"self.{arg} = {arg}")
-            c.unindent()
-
-        for method in self.methods:
-            c.extend(method.code(indent=c.current_indent))
-        c.line(f"def __repr__(self): return ' '.join(self.{HISTORY})")
-
-        c.unindent()
-
-        c.line("")
-
-        return c
-    
-    def __repr__(self) -> str:
-        return f"Class {self.name}"
-
-class PythonModule:
-    def __init__(self, classes: list[PythonClass], imports = []):
-        self.classes = classes
-        self.imports = imports
-
-    def find_class(self, name: str):
-        for python_class in self.classes:
-            if python_class.name == name:
-                return python_class
-        print(f"ERROR: DID NOT FIND '{name}'")
-        exit(1)
-
-    def code(self) -> str:
-        c = Code()
-
-        for imp in self.imports:
-            c.line(imp)
-
-        for python_class in self.classes:
-            c.line("")
-            c.extend(python_class.code())
-        return c
 
 def create_class(node, node_map: ForwardMap):
 
@@ -192,7 +76,7 @@ def create_class(node, node_map: ForwardMap):
             new_class = create_class(next_node, node_map)
             python_class.methods = new_class.methods
             continue
-        
+
         method_name = next_node.get_label()
         if not method_name: method_name = next_node.get_name()
         python_class.methods.append(PythonMethod(method_name))
@@ -233,16 +117,24 @@ def populate_methods(module: PythonModule):
                 method.returns = f"make_sql(self.{HISTORY})"
                 continue
             method_class = module.find_class(method.name)
-            method.args.extend(method_class.extra_args)
+            method.args = method_class.extra_args
             method.returns = f"{method_class.name}({', '.join(method_class.extra_args + [f'{HISTORY}=self.{HISTORY}'])})"
             if method_class.type == PythonClassType.SPECIFIER:
                 method.property = True
+
+        # Add __repr__ method
+        fields = list(map(lambda x: f"{{self.{x}}}", python_class.extra_args))
+        repr = ""
+        if len(fields) > 0: repr = f'f"{python_class.name} {", ".join(fields)}"'
+        else:               repr = f'f"{python_class.name}"'
+        method = PythonMethod("__repr__", returns=repr)
+        python_class.methods.append(method)
 
 def usage():
     print(f"{sys.argv[0]} <grammar> <output-path>")
 
 if __name__ == "__main__":
-    
+
     if len(sys.argv) != 3:
         print("Error incorrect number of arguments.")
         usage()

@@ -6,7 +6,7 @@ clean:
 dev:
 	rm -rf build
 	make build/query_builder/query.py
-	ls ./src/query_builder | xargs -I{} ln -s $(PWD)/src/query_builder/{} $(PWD)/build/query_builder
+	ls ./src/query_builder | xargs -I{} ln $(PWD)/src/query_builder/{} $(PWD)/build/query_builder
 
 build: build/query_builder/query.py
 	cp ./src/query_builder/* ./build/query_builder
