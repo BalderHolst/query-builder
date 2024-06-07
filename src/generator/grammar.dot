@@ -1,6 +1,10 @@
 # https://www.sqlite.org/syntaxdiagrams.html
 
 digraph my_graph {
+
+    # Draw graph from right to left
+    rankdir="LR";
+
     START;
     SELECT [label=SELECT];
     SELECT_TARGET [label=cols];
